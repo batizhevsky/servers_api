@@ -1,17 +1,38 @@
 require 'rails_helper'
 
 RSpec.describe Api::RacksController do
-
   describe 'index' do
-    let!(:racks) { FactoryGirl.create_list :rack_cabinet, 5 }
 
-    it 'show list of racks' do
-      get '/api/racks'
+    describe 'show list of racks' do
+      let!(:racks) { FactoryGirl.create_list :rack_cabinet, 5 }
+      before { get '/api/racks' }
 
-      expect(response).to have_http_status(:success)
+      it { expect(response).to  have_http_status(:success) }
+      it { expect(api_response.map {|r| r[:id] }).to be_include(racks.sample.id) }
+      it { expect(api_response.sample).to have_key(:name) }
+      it { expect(api_response.sample).to have_key(:location) }
+    end
 
-      expect(api_response.sample).to have_key(:name)
-      expect(api_response.sample).to have_key(:location)
+    describe 'filter racks without hosts' do
+      let!(:rack_with_server) { FactoryGirl.create :rack_cabinet, :with_server }
+      let!(:empty_rack) { FactoryGirl.create :rack_cabinet }
+
+      before { get '/api/racks?state=empty' }
+
+      it { expect(response).to have_http_status(:success) }
+      it { expect(api_response.map {|r| r[:id] }).to be_include(empty_rack.id) }
+      it { expect(api_response.map {|r| r[:id] }).to_not be_include(rack_with_server.id) }
+    end
+
+    describe 'filter racks with many APC' do
+      let!(:rack_multi_apc) { FactoryGirl.create :rack_cabinet, :with_multi_apc }
+      let!(:empty_rack) { FactoryGirl.create :rack_cabinet }
+
+      before { get '/api/racks?state=multi_apc' }
+
+      it { expect(response).to have_http_status(:success) }
+      it { expect(api_response.map {|r| r[:id] }).to be_include(rack_multi_apc.id) }
+      it { expect(api_response.map {|r| r[:id] }).to_not be_include(empty_rack.id) }
     end
   end
 
@@ -25,22 +46,33 @@ RSpec.describe Api::RacksController do
     end
   end
 
+  describe :show do
+    let!(:rack) { FactoryGirl.create(:rack_cabinet, name: 'old', location: 'dc2') }
+
+    it 'show rack ' do
+      get "/api/racks/#{ rack.id }"
+
+      expect(response).to have_http_status(:success)
+      expect(api_response[:id]).to eq rack.id
+    end
+  end
+
   describe :update do
     let!(:rack) { FactoryGirl.create(:rack_cabinet, name: 'old', location: 'dc2') }
 
-    it 'create new rack ' do
+    it 'rack attrs' do
       put "/api/racks/#{ rack.id }", name: 'new rack', location: 'dc1'
 
       expect(response).to have_http_status(:success)
-      expect(api_response[:name]).to eq 'test rack'
-      expect(api_response[:locatione]).to eq 'dc2'
+      expect(api_response[:name]).to eq 'new rack'
+      expect(api_response[:location]).to eq 'dc1'
     end
   end
 
   describe :destroy do
     let!(:rack) { FactoryGirl.create(:rack_cabinet, name: 'old', location: 'dc2') }
 
-    it 'create new rack ' do
+    it 'remove record from db' do
       delete "/api/racks/#{ rack.id }"
 
       expect(response).to have_http_status(:success)

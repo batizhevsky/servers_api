@@ -5,7 +5,6 @@ module Macros
     end
 
     def api_response
-      puts json_reply
       json_reply[:response]
     end
   end
